@@ -22,6 +22,8 @@ finger_component_class_color = {0: [255, 255, 255], # white
                                 }
 path = os.path.join(root_dir, "data")
 list_dataset = Path(path).glob("**/*.png")
+mask_dir_path = os.path.join(root_dir, "mask")
+os.makedirs(mask_dir_path, exist_ok=True)
 for p in list_dataset:
     print("read file", p.as_posix())
     img = cv2.imread(p.as_posix())
@@ -30,6 +32,6 @@ for p in list_dataset:
     window.show()
     rgb_mask = window.rgb_mask
     mask_name = "mask_" + p.name
-    mask_path = p.as_posix().replace(p.name, mask_name)
+    mask_path = os.path.join(mask_dir_path, mask_name)
     cv2.imwrite(mask_path, rgb_mask)
     print("mask file wroted on", mask_path)

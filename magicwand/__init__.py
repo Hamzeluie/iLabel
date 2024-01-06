@@ -17,7 +17,20 @@ def _find_exterior_contours(img):
 
 
 class SelectionWindow:
-    def __init__(self, img, class_color, name="Magic Wand Selector", connectivity=4, tolerance=32):
+    def __init__(self, img: np.uint8, 
+                 class_color: dict, 
+                 name: str="Magic Wand Selector", 
+                 connectivity:int=4, 
+                 tolerance:int=32):
+        """_summary_
+
+        Args:
+            img (np.uint8): original image
+            class_color (dict): label class dict to map each key to a color exp: {0: [0,255,0], 1:[255,0,0],...}
+            name (str, optional): name of original image window. Defaults to "Magic Wand Selector".
+            connectivity (int, optional): _description_. Defaults to 4.
+            tolerance (int, optional): tolerance of selecting area. Defaults to 32.
+        """
         self.org_img = img.copy()
         self.connectivity = connectivity
         self.name = name
@@ -54,54 +67,67 @@ class SelectionWindow:
         cv.setMouseCallback("rgb final mask", self._mouse_rgb_callback)
 
     def _trackbar_callback(self, pos):
+        """_summary_
+
+        Args:
+            pos (_type_): set position of trace bar to tolerance
+        """
         self.tolerance = (pos,) * 3
     
     def _eraser_size_callback(self, size):
+        """_summary_
+
+        Args:
+            size (_type_): eraser size can be set by trace bar of 'rgb final mask' window
+        """
         self.eraser_size = size
 
-    def _cut_selected_area(self, x, y):
+    def _refresh_mask(self):
+        """this func erase other area of cut line
+        """
+        contours, _ = cv.findContours(self.mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_NONE)
+        tmp_mask = np.zeros_like(self.mask)
+        for idx, cnt in enumerate(contours):
+            cv.drawContours(tmp_mask, [cnt], -1, (255, 255, 255), thickness=cv.FILLED)
+            index_of_cnt = np.where(tmp_mask == 255)
+            if tuple(self.click_point) not in list(zip(index_of_cnt[1].tolist(), index_of_cnt[0].tolist())):
+                cv.drawContours(self.mask, [cnt], -1, (0, 0, 0), thickness=cv.FILLED)
+            tmp_mask = np.zeros_like(self.mask)
+                    
+    def _cut_selected_area(self, x:int, y:int):
+        """get coordinates of click points. then cut the other side of the selected area
+
+        Args:
+            x (int): x coordinate
+            y (int): y coordinate
+        """
         self.cut_points.append([x, y])
         if len(self.cut_points) % 2 == 0:
             last2cut_points = self.cut_points[-2:]
             # draw line in preview image
             cv.line(self.img, tuple(last2cut_points[0]), tuple(last2cut_points[1]), (80, 80, 80), thickness=3)
             # draw line in line_mask
-            line = cv.line(self.line_mask, tuple(last2cut_points[0]), tuple(last2cut_points[1]), (255, 255, 255))
+            line = cv.line(self.line_mask, tuple(last2cut_points[0]), tuple(last2cut_points[1]), (255, 255, 255), thickness=3)
             # get places which line cut segment
             roi_line = cv.bitwise_and(self.mask, line)
             # get indexes of roi_line then calculate align of segmentation to cur (X, Y)
             index_of_cut_roi = np.where(roi_line == 255)
-            min_x_index = np.min(index_of_cut_roi[1])
-            min_y_index = np.min(index_of_cut_roi[0])
-            max_x_index = np.max(index_of_cut_roi[1])
-            max_y_index = np.max(index_of_cut_roi[0])
-            align_base_on_x_y = "Y" if (max_y_index - min_y_index) > (max_x_index - min_x_index) else "X"
-            # cut segment base on roi_line
-            if align_base_on_x_y == "Y":
-                if self.click_point[0] < max_x_index:
-                    # get left. or cut right of segmentation
-                    self.mask[:, max_x_index:] = 0
-                    print("get left")
-                else:
-                    # get right. or cut left of segmentation
-                    self.mask[:, :max_x_index] = 0
-                    print("get right")
-            else:
-                if self.click_point[1] < max_y_index:
-                    # get top. or cut down of segmentation
-                    self.mask[max_y_index:, :] = 0
-                    print("get top")
-                else:
-                    # get down. or cut top of segmentation
-                    self.mask[:max_y_index, :] = 0
-                    print("get down")
-                    
-            cv.imwrite("/home/mehdi/Documents/projects/Protect_the_Great_Barrier_Reef/resana/seg1.png", self.mask.astype("uint8"))
+            # cut segment base on roi_line           
+            for x, y in zip(index_of_cut_roi[1], index_of_cut_roi[0]):
+                self.mask[y, x] = 0
+            self._refresh_mask()
             h, w = self.img.shape[:2]
             self.line_mask = np.zeros((h, w), dtype=np.uint8)
     
-    def _mouse_rgb_callback(self, event, x, y, flags, *userdata):
-        
+    def _mouse_rgb_callback(self, event, x:int, y:int, flags, *userdata):
+        """this is an eraser callback
+
+        Args:
+            event (_type_): cv EVENT_LBUTTONDOWN
+            x (_type_): x coordinate
+            y (_type_): y coordinate
+            flags (_type_): None
+        """
         if event == cv.EVENT_LBUTTONDOWN:
             self.drawing = True
         elif event==cv.EVENT_MOUSEMOVE:
@@ -111,7 +137,15 @@ class SelectionWindow:
             self.drawing = False
         self._update()
     
-    def _mouse_callback(self, event, x, y, flags, *userdata):
+    def _mouse_callback(self, event, x:int, y:int, flags, *userdata):
+        """this is original image window callback
+
+        Args:
+            event (_type_): cv EVENT_LBUTTONDOWN
+            x (int): x coordinate
+            y (int): y coordinate
+            flags (_type_): None
+        """
 
         if event != cv.EVENT_LBUTTONDOWN:
             return
@@ -156,20 +190,32 @@ class SelectionWindow:
         self.mean, self.stddev = cv.meanStdDev(self.img, mask=self.mask)
         meanstr = "mean=({:.2f}, {:.2f}, {:.2f})".format(*self.mean[:, 0])
         stdstr = "std=({:.2f}, {:.2f}, {:.2f})".format(*self.stddev[:, 0])
-        self.show_image(viz)
+        self._show_image(viz)
         cv.displayStatusBar(self.name, ", ".join((meanstr, stdstr)))
 
-    def show_image(self, viz):
+    def _show_image(self, viz:np.uint8):
+        """show all results windows
+
+        Args:
+            viz (np.uint8): feedbacked original image
+        """
         cv.imshow(self.name, viz)
         cv.imshow("binary last mask", self.mask)
         cv.imshow("rgb final mask", self.rgb_mask)
         
-    def destroyWindows(self):
+    def _destroyWindows(self):
+        """destroy all opened windows
+        """
         cv.destroyWindow(self.name)
         cv.destroyWindow("rgb final mask")
         cv.destroyWindow("binary last mask")
     
-    def set_segment_class(self, key):
+    def _set_segment_class(self, key):
+        """Colors segment of selected area
+
+        Args:
+            key (key of 'class_color'): _description_
+        """
         b_id, g_id, r_id = self.class_color[int(chr(key))]
         self.rgb_mask[self.mask == 255, 0] = b_id
         self.rgb_mask[self.mask == 255, 1] = g_id
@@ -182,18 +228,19 @@ class SelectionWindow:
         print("Press [q] or [esc] to close the window and Press [c] to reset windows")
         while True:
             k = cv.waitKey() & 0xFF
-            print(k)
             if k in (ord("q"), ord("\x1b")):
-                self.destroyWindows()
+                self._destroyWindows()
                 break
             if k in [ord(str(k)) for k in self.class_color.keys()]:
-                self.set_segment_class(k)
+                self._set_segment_class(k)
             if k == ord("\x08"): # back space
                 pass
             if k == ord("c"):
                 self._reset_window()
     
     def _reset_window(self):
+        """with pressing [c] button. reset all selected areas
+        """
         self.img = self.org_img.copy()
         h, w = self.img.shape[:2]
         self.mask = np.zeros((h, w), dtype=np.uint8)
