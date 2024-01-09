@@ -16,7 +16,7 @@ $ source venv/bin/activate
 it has three windows as you can see in the image
 
 # Magic Wand Selector window:
-this shows the original image. It gives you the ability to select an area like a magic wand tool. also, you can add separated area with "SHIFT_KEY + left button click", deselect the area with "ALT_KEY + left button click" or **you can custom cut a line shape selected area by pressing CTRL + left button click to the start point of cut line then again CTRL + left button click to the endpoint to cut a line selected area.**
+this shows the original image. It gives you the ability to select an area like a magic wand tool. also, you can add separated area with "SHIFT_KEY + left button click", get threshold of the area with "ALT_KEY + left button click" or **you can custom cut a line shape selected area by pressing CTRL + left button click to the start point of cut line then again CTRL + left button click to the endpoint to cut a line selected area.**
  
 # binary last mask  window: 
 this window shows the current selected area like a binary mask to allow you to manage segments better.

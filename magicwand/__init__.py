@@ -169,7 +169,8 @@ class SelectionWindow:
             self.mask = cv.bitwise_or(self.mask, flood_mask)
             self.click_point = [x, y]
         elif modifier == ALT_KEY:
-            self.mask = cv.bitwise_and(self.mask, cv.bitwise_not(flood_mask))
+            self.mask = cv.threshold(cv.cvtColor(self.img, cv.COLOR_RGB2GRAY), 200, 255, cv.THRESH_BINARY)[1]
+            # self.mask = cv.bitwise_and(self.mask, cv.bitwise_not(flood_mask))
             self.click_point = [x, y]
         elif modifier == CTRLKEY:
             self._cut_selected_area(x, y)
