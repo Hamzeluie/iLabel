@@ -1,5 +1,6 @@
 import cv2 as cv
 import numpy as np
+from pascal_voc_writer import Writer
 
 
 SHIFT_KEY = cv.EVENT_FLAG_SHIFTKEY
@@ -17,8 +18,9 @@ def _find_exterior_contours(img):
 
 
 class SelectionWindow:
-    def __init__(self, img: np.uint8, 
+    def __init__(self, img: np.uint8,
                  class_color: dict, 
+                 img_path:str = "",
                  name: str="Magic Wand Selector", 
                  connectivity:int=4, 
                  tolerance:int=32):
@@ -42,8 +44,12 @@ class SelectionWindow:
         self.class_color = class_color
         self.click_point = []
         self.cut_points = []
+        self.orientaion_points = []
         self.line_mask = np.zeros((h, w), dtype=np.uint8)
         self.drawing = False
+        self.img_path = img_path
+        self.writer = Writer(img_path, w, h)
+        self.last_class = -1
         # =======
         self._flood_mask = np.zeros((h + 2, w + 2), dtype=np.uint8)
         self._flood_fill_flags = (
@@ -94,30 +100,43 @@ class SelectionWindow:
                 cv.drawContours(self.mask, [cnt], -1, (0, 0, 0), thickness=cv.FILLED)
             tmp_mask = np.zeros_like(self.mask)
                     
-    def _cut_selected_area(self, x:int, y:int):
+    def _cut_selected_area(self, x:int, y:int, orientation_flag=False):
         """get coordinates of click points. then cut the other side of the selected area
 
         Args:
             x (int): x coordinate
             y (int): y coordinate
         """
-        self.cut_points.append([x, y])
-        if len(self.cut_points) % 2 == 0:
-            last2cut_points = self.cut_points[-2:]
-            # draw line in preview image
-            cv.line(self.img, tuple(last2cut_points[0]), tuple(last2cut_points[1]), (80, 80, 80), thickness=3)
-            # draw line in line_mask
-            line = cv.line(self.line_mask, tuple(last2cut_points[0]), tuple(last2cut_points[1]), (255, 255, 255), thickness=3)
-            # get places which line cut segment
-            roi_line = cv.bitwise_and(self.mask, line)
-            # get indexes of roi_line then calculate align of segmentation to cur (X, Y)
-            index_of_cut_roi = np.where(roi_line == 255)
-            # cut segment base on roi_line           
-            for x, y in zip(index_of_cut_roi[1], index_of_cut_roi[0]):
-                self.mask[y, x] = 0
-            self._refresh_mask()
-            h, w = self.img.shape[:2]
-            self.line_mask = np.zeros((h, w), dtype=np.uint8)
+        if orientation_flag:
+            self.orientaion_points.append([x, y])
+            if len(self.orientaion_points) % 2 == 0:
+                last2cut_points = self.orientaion_points[-2:]
+                # draw line in preview image
+                cv.arrowedLine(self.img, tuple(last2cut_points[0]), tuple(last2cut_points[1]), (200, 0, 0), thickness=3)
+                self.writer.addObject(self.last_class, 
+                            last2cut_points[0][0],
+                            last2cut_points[0][1],
+                            last2cut_points[1][0],
+                            last2cut_points[1][1])
+                
+        else:
+            self.cut_points.append([x, y])
+            if len(self.cut_points) % 2 == 0:
+                last2cut_points = self.cut_points[-2:]
+                # draw line in preview image
+                cv.line(self.img, tuple(last2cut_points[0]), tuple(last2cut_points[1]), (80, 80, 80), thickness=3)
+                # draw line in line_mask
+                line = cv.line(self.line_mask, tuple(last2cut_points[0]), tuple(last2cut_points[1]), (255, 255, 255), thickness=3)
+                # get places which line cut segment
+                roi_line = cv.bitwise_and(self.mask, line)
+                # get indexes of roi_line then calculate align of segmentation to cur (X, Y)
+                index_of_cut_roi = np.where(roi_line == 255)
+                # cut segment base on roi_line           
+                for x, y in zip(index_of_cut_roi[1], index_of_cut_roi[0]):
+                    self.mask[y, x] = 0
+                self._refresh_mask()
+                h, w = self.img.shape[:2]
+                self.line_mask = np.zeros((h, w), dtype=np.uint8)        
     
     def _mouse_rgb_callback(self, event, x:int, y:int, flags, *userdata):
         """this is an eraser callback
@@ -169,16 +188,19 @@ class SelectionWindow:
             self.mask = cv.bitwise_or(self.mask, flood_mask)
             self.click_point = [x, y]
         elif modifier == ALT_KEY:
-            self.mask = cv.threshold(cv.cvtColor(self.img, cv.COLOR_RGB2GRAY), 200, 255, cv.THRESH_BINARY)[1]
+            self.mask = cv.threshold(cv.cvtColor(self.img, cv.COLOR_RGB2GRAY), 200, 255, cv.THRESH_BINARY_INV)[1]
+            self.mask = cv.bitwise_not(self.mask)
             # self.mask = cv.bitwise_and(self.mask, cv.bitwise_not(flood_mask))
-            self.click_point = [x, y]
+        elif modifier == (ALT_KEY + CTRLKEY):
+            self._cut_selected_area(x, y, orientation_flag=True)
         elif modifier == CTRLKEY:
             self._cut_selected_area(x, y)
         else:
             self.mask = flood_mask
             self.click_point = [x, y]
-
         self._update()
+
+        
 
     def _update(self):
         """Updates an image in the already drawn window."""
@@ -194,6 +216,7 @@ class SelectionWindow:
         self._show_image(viz)
         cv.displayStatusBar(self.name, ", ".join((meanstr, stdstr)))
 
+    
     def _show_image(self, viz:np.uint8):
         """show all results windows
 
@@ -217,11 +240,18 @@ class SelectionWindow:
         Args:
             key (key of 'class_color'): _description_
         """
-        b_id, g_id, r_id = self.class_color[int(chr(key))]
+        key_id = int(chr(key))
+        self.last_class = self.class_color[key_id][1]
+        b_id, g_id, r_id = self.class_color[key_id][0]
         self.rgb_mask[self.mask == 255, 0] = b_id
         self.rgb_mask[self.mask == 255, 1] = g_id
         self.rgb_mask[self.mask == 255, 2] = r_id
         self._update()
+    
+    def pascal_voc_save(self):
+        file_name = self.img_path.split("/")[-1]
+        file_extention = file_name.split(".")[-1]
+        self.writer.save(self.img_path.replace(file_extention, "xml"))
     
     def show(self):
         """Draws a window with the supplied image."""
@@ -230,6 +260,7 @@ class SelectionWindow:
         while True:
             k = cv.waitKey() & 0xFF
             if k in (ord("q"), ord("\x1b")):
+                self.pascal_voc_save()
                 self._destroyWindows()
                 break
             if k in [ord(str(k)) for k in self.class_color.keys()]:
