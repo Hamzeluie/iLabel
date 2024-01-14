@@ -1,0 +1,15 @@
+<annotation>
+    <folder>data</folder>
+    <filename>001_L0_0.bmp</filename>
+    <path>/home/mehdi/Documents/projects/Protect_the_Great_Barrier_Reef/resana/iLabel/data/001_L0_0.bmp</path>
+    <source>
+        <database>Unknown</database>
+    </source>
+    <size>
+        <width>328</width>
+        <height>376</height>
+        <depth>3</depth>
+    </size>
+    <segmented>0</segmented>
+
+</annotation>

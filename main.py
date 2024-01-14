@@ -14,8 +14,16 @@ finger_component_class_color = {0: ([255, 255, 255], "ridge"), # white
                                 5: ([255, 255, 0], "ice_land and dot"), # sky blue
                                 6: ([255, 0, 255], "hook and duble bifraction"), # Purple
                                 }
-path = os.path.join(root_dir, "data")
-list_dataset = Path(path).glob("**/*.png")
+def assist(org_img_path, mask):
+    res = cv2.imread(org_img_path)
+    y_list, x_list = np.where(mask == 255)
+    for x, y in zip(x_list, y_list):
+        res[y, x, 2] = 255
+    return res
+path_mask = os.path.join(root_dir, "data")
+path_org = os.path.join(root_dir, "data_enhance")
+
+list_dataset = Path(path_mask).glob("**/*.bmp")
 mask_dir_path = os.path.join(root_dir, "mask")
 os.makedirs(mask_dir_path, exist_ok=True)
 for p in list_dataset:
@@ -25,8 +33,9 @@ for p in list_dataset:
     img = cv2.GaussianBlur(img, (3, 3), 0, 0)
     img = cv2.adaptiveThreshold(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 33, 0)
     # open window to segment
+    assist_image = assist(os.path.join(path_org, p.name), img)
     img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-    window = SelectionWindow(img, finger_component_class_color, img_path=p.as_posix())
+    window = SelectionWindow(img=img, assistance_image=assist_image, class_color=finger_component_class_color)
     window.show()
     rgb_mask = window.rgb_mask
     mask_name = "mask_" + p.name

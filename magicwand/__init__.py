@@ -19,6 +19,7 @@ def _find_exterior_contours(img):
 
 class SelectionWindow:
     def __init__(self, img: np.uint8,
+                 assistance_image:np.uint8,
                  class_color: dict, 
                  img_path:str = "",
                  name: str="Magic Wand Selector", 
@@ -40,6 +41,8 @@ class SelectionWindow:
         self.img = img.copy()
         self.mask = np.zeros((h, w), dtype=np.uint8)
         # ========
+        self.assistance_image = assistance_image
+        self.box_size = 16
         self.rgb_mask = np.zeros((h, w, 3), dtype=np.uint8)
         self.class_color = class_color
         self.click_point = []
@@ -57,12 +60,17 @@ class SelectionWindow:
         )  # 255 << 8 tells to fill with the value 255
         cv.namedWindow(self.name, cv.WINDOW_NORMAL)
         # =========
+        
+        cv.namedWindow("assistance_image", cv.WINDOW_NORMAL)
         cv.namedWindow("rgb final mask", cv.WINDOW_NORMAL)
         cv.namedWindow("binary last mask", cv.WINDOW_NORMAL)
         # =========
         self.tolerance = (tolerance,) * 3
         cv.createTrackbar(
             "Tolerance", self.name, tolerance, 255, self._trackbar_callback
+        )
+        cv.createTrackbar(
+            "box_size", self.name, tolerance, 256, self._box_size_callback
         )
         cv.setMouseCallback(self.name, self._mouse_callback)
         # ======
@@ -71,6 +79,10 @@ class SelectionWindow:
             "Eraser Size", "rgb final mask", 1, 10, self._eraser_size_callback
         )
         cv.setMouseCallback("rgb final mask", self._mouse_rgb_callback)
+        cv.createTrackbar(
+            "Eraser Size", "binary last mask", 1, 10, self._eraser_size_callback
+        )
+        cv.setMouseCallback("binary last mask", self._mouse_rgb_callback)
 
     def _trackbar_callback(self, pos):
         """_summary_
@@ -80,6 +92,14 @@ class SelectionWindow:
         """
         self.tolerance = (pos,) * 3
     
+    def _box_size_callback(self, pos):
+        """_summary_
+
+        Args:
+            pos (_type_): set position of trace bar to tolerance
+        """
+        self.box_size = pos
+        
     def _eraser_size_callback(self, size):
         """_summary_
 
@@ -121,22 +141,29 @@ class SelectionWindow:
                 
         else:
             self.cut_points.append([x, y])
-            if len(self.cut_points) % 2 == 0:
-                last2cut_points = self.cut_points[-2:]
-                # draw line in preview image
-                cv.line(self.img, tuple(last2cut_points[0]), tuple(last2cut_points[1]), (80, 80, 80), thickness=3)
-                # draw line in line_mask
-                line = cv.line(self.line_mask, tuple(last2cut_points[0]), tuple(last2cut_points[1]), (255, 255, 255), thickness=3)
-                # get places which line cut segment
-                roi_line = cv.bitwise_and(self.mask, line)
-                # get indexes of roi_line then calculate align of segmentation to cur (X, Y)
-                index_of_cut_roi = np.where(roi_line == 255)
-                # cut segment base on roi_line           
-                for x, y in zip(index_of_cut_roi[1], index_of_cut_roi[0]):
-                    self.mask[y, x] = 0
-                self._refresh_mask()
-                h, w = self.img.shape[:2]
-                self.line_mask = np.zeros((h, w), dtype=np.uint8)        
+            last2cut_points = self.cut_points[-1]
+            # draw line in preview image
+            x_min = last2cut_points[0] - (self.box_size // 2)
+            x_max = last2cut_points[0] + (self.box_size // 2)
+            y_min = last2cut_points[1] - (self.box_size // 2)
+            y_max = last2cut_points[1] + (self.box_size // 2)
+            
+            cv.rectangle(self.img, (x_min, y_min), (x_max, y_max), (80, 80, 80), thickness=3)
+            # cv.line(self.img, tuple(last2cut_points[0]), tuple(last2cut_points[1]), (80, 80, 80), thickness=3)
+            # draw line in line_mask
+            box = cv.rectangle(self.line_mask, (x_min, y_min), (x_max, y_max), (255, 255, 255), thickness=-1)
+            # line = cv.line(self.line_mask, tuple(last2cut_points[0]), tuple(last2cut_points[1]), (255, 255, 255), thickness=3)
+            # get places which line cut segment
+            roi_box = cv.bitwise_and(self.mask, box)
+            self.mask = roi_box.copy()
+            # get indexes of roi_line then calculate align of segmentation to cur (X, Y)
+            # index_of_cut_roi = np.where(roi_line == 255)
+            # # cut segment base on roi_line           
+            # for x, y in zip(index_of_cut_roi[1], index_of_cut_roi[0]):
+            #     self.mask[y, x] = 0
+            self._refresh_mask()
+            h, w = self.img.shape[:2]
+            self.line_mask = np.zeros((h, w), dtype=np.uint8)        
     
     def _mouse_rgb_callback(self, event, x:int, y:int, flags, *userdata):
         """this is an eraser callback
@@ -152,6 +179,7 @@ class SelectionWindow:
         elif event==cv.EVENT_MOUSEMOVE:
             if self.drawing == True:
                 cv.circle(self.rgb_mask, (x,y), self.eraser_size,(0,0,0),-1)
+                cv.circle(self.mask, (x,y), self.eraser_size,(0,0,0),-1)
         elif event == cv.EVENT_LBUTTONUP:
             self.drawing = False
         self._update()
@@ -224,6 +252,7 @@ class SelectionWindow:
             viz (np.uint8): feedbacked original image
         """
         cv.imshow(self.name, viz)
+        cv.imshow("assistance_image", self.assistance_image)
         cv.imshow("binary last mask", self.mask)
         cv.imshow("rgb final mask", self.rgb_mask)
         
@@ -231,6 +260,8 @@ class SelectionWindow:
         """destroy all opened windows
         """
         cv.destroyWindow(self.name)
+    
+        cv.destroyWindow("assistance_image")
         cv.destroyWindow("rgb final mask")
         cv.destroyWindow("binary last mask")
     
