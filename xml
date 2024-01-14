@@ -1,7 +1,7 @@
 <annotation>
-    <folder>data</folder>
-    <filename>001_L0_0.bmp</filename>
-    <path>/home/mehdi/Documents/projects/Protect_the_Great_Barrier_Reef/resana/iLabel/data/001_L0_0.bmp</path>
+    <folder>resana</folder>
+    <filename>iLabel</filename>
+    <path>/home/mehdi/Documents/projects/Protect_the_Great_Barrier_Reef/resana/iLabel</path>
     <source>
         <database>Unknown</database>
     </source>

@@ -24,7 +24,8 @@ class SelectionWindow:
                  img_path:str = "",
                  name: str="Magic Wand Selector", 
                  connectivity:int=4, 
-                 tolerance:int=32):
+                 tolerance:int=32,
+                 write_xml=False):
         """_summary_
 
         Args:
@@ -41,6 +42,7 @@ class SelectionWindow:
         self.img = img.copy()
         self.mask = np.zeros((h, w), dtype=np.uint8)
         # ========
+        self.write_xml = write_xml
         self.assistance_image = assistance_image
         self.box_size = 16
         self.rgb_mask = np.zeros((h, w, 3), dtype=np.uint8)
@@ -260,7 +262,6 @@ class SelectionWindow:
         """destroy all opened windows
         """
         cv.destroyWindow(self.name)
-    
         cv.destroyWindow("assistance_image")
         cv.destroyWindow("rgb final mask")
         cv.destroyWindow("binary last mask")
@@ -291,7 +292,8 @@ class SelectionWindow:
         while True:
             k = cv.waitKey() & 0xFF
             if k in (ord("q"), ord("\x1b")):
-                self.pascal_voc_save()
+                if self.write_xml:
+                    self.pascal_voc_save()
                 self._destroyWindows()
                 break
             if k in [ord(str(k)) for k in self.class_color.keys()]:
