@@ -20,13 +20,21 @@ def assist(org_img_path, mask):
     for x, y in zip(x_list, y_list):
         res[y, x, 2] = 255
     return res
-path_mask = os.path.join(root_dir, "data")
-path_org = os.path.join(root_dir, "data_enhance")
+# path_mask = os.path.join(root_dir, "casia_enhance")
+# path_org = os.path.join(root_dir, "casia")
+
+path_mask = os.path.join(root_dir, "casia_enhance")
+path_org = os.path.join(root_dir, "casia")
 
 list_dataset = Path(path_mask).glob("**/*.bmp")
 mask_dir_path = os.path.join(root_dir, "mask")
 os.makedirs(mask_dir_path, exist_ok=True)
 for p in list_dataset:
+    # mask path 
+    mask_name = "mask_" + p.name
+    mask_path = os.path.join(mask_dir_path, mask_name)
+    if os.path.isfile(mask_path):
+        continue
     print("read file", p.as_posix())
     img = cv2.imread(p.as_posix())
     # img = cv2.bitwise_not(img)
@@ -38,7 +46,6 @@ for p in list_dataset:
     window = SelectionWindow(img=img, assistance_image=assist_image, class_color=finger_component_class_color)
     window.show()
     rgb_mask = window.rgb_mask
-    mask_name = "mask_" + p.name
-    mask_path = os.path.join(mask_dir_path, mask_name)
+    
     cv2.imwrite(mask_path, rgb_mask)
     print("mask file wroted on", mask_path)
