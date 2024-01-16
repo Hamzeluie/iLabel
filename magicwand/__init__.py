@@ -176,12 +176,17 @@ class SelectionWindow:
             y (_type_): y coordinate
             flags (_type_): None
         """
+        modifier = flags & (CTRLKEY)
         if event == cv.EVENT_LBUTTONDOWN:
             self.drawing = True
         elif event==cv.EVENT_MOUSEMOVE:
             if self.drawing == True:
-                cv.circle(self.rgb_mask, (x,y), self.eraser_size,(0,0,0),-1)
-                cv.circle(self.mask, (x,y), self.eraser_size,(0,0,0),-1)
+                if modifier == CTRLKEY:
+                    cv.circle(self.rgb_mask, (x,y), self.eraser_size,(255,255,255),-1)
+                    cv.circle(self.mask, (x,y), self.eraser_size,(255,255,255),-1)
+                else:
+                    cv.circle(self.rgb_mask, (x,y), self.eraser_size,(0,0,0),-1)
+                    cv.circle(self.mask, (x,y), self.eraser_size,(0,0,0),-1)
         elif event == cv.EVENT_LBUTTONUP:
             self.drawing = False
         self._update()
